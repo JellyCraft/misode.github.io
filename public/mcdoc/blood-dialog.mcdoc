@@ -1,0 +1,93 @@
+use ::java::util::text::Text
+
+dispatch minecraft:resource[blood:blood-dialog] to struct Dialog {
+  id: string,
+  /// True by default
+  condition?: Condition,
+  actors: [Actor],
+  root: [Node],
+}
+
+struct Condition {
+  condition: string,
+  and?: [Condition],
+  or?: [Condition],
+}
+
+struct Actor {
+  /// Can be used as ref in TellNode
+  id: string,
+  entity: string,
+}
+
+// --- Nodes ---
+
+dispatch blood:nodes[blood:tell_node] to struct {
+  text: Text,
+  actor: string,
+}
+
+dispatch blood:nodes[blood:say_node] to struct {
+  text: Text,
+}
+
+dispatch blood:nodes[blood:branch_node] to struct {
+  condition: Condition,
+  label: string,
+}
+
+struct Choice {
+  text: Text,
+  /// Jumps to said label
+  label: string,
+}
+
+dispatch blood:nodes[blood:choice_node] to struct {
+  choices: [Choice],
+}
+
+dispatch blood:nodes[blood:label_node] to struct {
+  label: string,
+}
+
+dispatch blood:nodes[blood:action_node] to struct {
+  action: Action
+}
+
+dispatch blood:nodes[blood:end_node] to struct {
+}
+
+dispatch minecraft:resource[blood:nodes] to struct Node {
+  type: NodeType,
+  ...blood:nodes[[type]],
+}
+
+enum(string) NodeType {
+  TellNode = "blood:tell_node",
+  SayNode = "blood:say_node",
+  BranchNode = "blood:branch_node",
+  ChoiceNode = "blood:choice_node",
+  LabelNode = "blood:label_node",
+  ActionNode = "blood:action_node",
+  EndNode = "blood:end_node"
+}
+
+// --- Actions ---
+
+dispatch minecraft:resource[blood:actions] to struct Action {
+  type: ActionType,
+  ...blood:actions[[type]],
+}
+
+dispatch blood:actions[blood:command_action] to struct {
+  command: string,
+}
+
+dispatch blood:actions[blood:set_actor_name_action] to struct {
+  actorName: Text,
+}
+
+enum(string) ActionType {
+  Command = "blood:command_action",
+  SetActorName = "blood:set_actor_name_action"
+}
