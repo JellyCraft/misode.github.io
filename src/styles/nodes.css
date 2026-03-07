@@ -135,6 +135,7 @@
   font-size: 18px;
   padding-left: 9px;
   padding-top: 5px;
+  resize: both;
   background-color: var(--node-background-input);
 }
 

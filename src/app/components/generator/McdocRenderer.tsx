@@ -1,10 +1,14 @@
 import * as core from '@spyglassmc/core'
-import { ColorFormat } from '@spyglassmc/core'
+import type {PairNode} from '@spyglassmc/core'
+import {ColorFormat} from '@spyglassmc/core'
 import type { JsonPairNode } from '@spyglassmc/json'
 import * as json from '@spyglassmc/json'
 import { JsonArrayNode, JsonBooleanNode, JsonNode, JsonNumberNode, JsonObjectNode, JsonStringNode } from '@spyglassmc/json'
 import { localeQuote } from '@spyglassmc/locales'
-import type { ListType, LiteralType, McdocType, NumericType, PrimitiveArrayType, StringType, TupleType, UnionType } from '@spyglassmc/mcdoc'
+import type {
+	ListType, LiteralType, McdocType, NumericType, PrimitiveArrayType, StringType,
+	TupleType, UnionType,
+} from '@spyglassmc/mcdoc'
 import { handleAttributes } from '@spyglassmc/mcdoc/lib/runtime/attribute/index.js'
 import type { SimplifiedEnum, SimplifiedMcdocType, SimplifiedMcdocTypeNoUnion, SimplifiedStructType, SimplifiedStructTypePairField } from '@spyglassmc/mcdoc/lib/runtime/checker/index.js'
 import { getValues } from '@spyglassmc/mcdoc/lib/runtime/completer/index.js'
@@ -160,6 +164,10 @@ function StringHead({ type, optional, excludeStrings, node, ctx }: Props<StringT
 		? idAttribute.values.tags.value.value
 		: undefined
 	const isSelect = idRegistry && isSelectRegistry(idRegistry)
+	const isLabel = ((node?.parent?.parent as any)?.typeDef?.fields[0]?.type?.path as string)
+		?.endsWith('blood-dialog::NodeType')
+	const isLabelRef = !isLabel && (node?.parent as PairNode<any, any>)?.key?.value === 'label'
+	const elementId = isLabel ? value ?? undefined : undefined
 
 	const onChangeValue = useCallback((newValue: string) => {
 		newValue = newValue.replaceAll('\\n', '\n')
@@ -216,10 +224,14 @@ function StringHead({ type, optional, excludeStrings, node, ctx }: Props<StringT
 			{completions.length > 0 && <datalist id={datalistId}>
 				{completions.map(c => <option>{c.value}</option>)}
 			</datalist>}
-			<input class={colorKind === 'hex_rgb' ? 'short-input' : idRegistry ? 'long-input' : ''} value={value ?? ''} onInput={(e) => setValue((e.target as HTMLInputElement).value)} onBlur={onCommitValue} onSubmit={onCommitValue} onKeyDown={(e) => {if (e.key === 'Enter') onCommitValue()}} list={completions.length > 0 ? datalistId : undefined} />
+			<textarea class={colorKind === 'hex_rgb' ? 'short-input' : idRegistry ? 'long-input' : ''} id={elementId} value={value ?? ''} onInput={(e) => setValue((e.target as HTMLInputElement).value)} onBlur={onCommitValue} onSubmit={onCommitValue} onKeyDown={(e) => {if (e.key === 'Enter') onCommitValue()}} list={completions.length > 0 ? datalistId : undefined} />
 			{value && gen && <a href={`/${gen.url}/?preset=${value?.replace(/^minecraft:/, '')}`} class="tooltipped tip-se" aria-label={locale('follow_reference')}>
 				{Octicon.link_external}
 			</a>}
+			{isLabelRef && value && <a href={'#' + value}>
+				{Octicon.arrow_right}
+			</a>
+			}
 		</>}
 		{colorKind === 'hex_rgb' && <>
 			<input class="short-input" type="color" value={value} onChange={(e) => onChangeValue((e.target as HTMLInputElement).value)} />
@@ -569,7 +581,7 @@ function StructBody({ type: outerType, node, ctx }: Props<SimplifiedStructType>)
 			if (!field || (field.key.kind === 'any' && field.type.kind === 'any')) {
 				return <UnknownField key={key} pair={pair} index={index} fieldKey={key} type={type} node={node} ctx={ctx} />
 			}
-			return <DynamicField key={key} pair={pair} index={index} field={field} fieldKey={key} isToggled={isToggled(key)} expand={expand(key)} collapse={collapse(key)}type={type} node={node} ctx={ctx} />
+			return <DynamicField key={key} pair={pair} index={index} field={field} fieldKey={key} isToggled={isToggled(key)} expand={expand(key)} collapse={collapse(key)} type={type} node={node} ctx={ctx} />
 		})}
 	</>
 }
