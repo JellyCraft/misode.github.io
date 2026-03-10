@@ -1,5 +1,6 @@
 import { route } from 'preact-router'
 import { useCallback, useEffect, useErrorBoundary, useMemo, useRef, useState } from 'preact/hooks'
+import { fileUtil } from '@spyglassmc/core'
 import type { Method } from '../../Analytics.js'
 import { Analytics } from '../../Analytics.js'
 import type { ConfigGenerator } from '../../Config.js'
@@ -8,6 +9,7 @@ import { DRAFT_PROJECT, useLocale, useProject, useVersion } from '../../contexts
 import { useModal } from '../../contexts/Modal.jsx'
 import { useSpyglass, watchSpyglassUri } from '../../contexts/Spyglass.jsx'
 import { AsyncCancel, useActiveTimeout, useAsync, useLocalStorage, useSearchParam } from '../../hooks/index.js'
+import { DefaultApi } from '../../services/integration/gen/index.js'
 import type { VersionId } from '../../services/index.js'
 import { checkVersion, fetchDependencyMcdoc, fetchPreset, fetchRegistries, getSnippet, shareSnippet } from '../../services/index.js'
 import { DEPENDENCY_URI } from '../../services/Spyglass.js'
@@ -287,6 +289,95 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const [doCopy, setCopy] = useState(0)
 	const [doDownload, setDownload] = useState(0)
 	const [doImport, setImport] = useState(0)
+	const isDialogGenerator = gen.id === 'blood:blood-dialog'
+	const dialogApi = useMemo(() => new DefaultApi(), [])
+	const dialogFilePickerRef = useRef<HTMLDialogElement>(null)
+	const [dialogFilePickerLoading, setDialogFilePickerLoading] = useState(false)
+	const [dialogFileAction, setDialogFileAction] = useState<'upload' | 'download' | 'delete'>('download')
+	const [dialogFiles, setDialogFiles] = useState<string[]>([])
+	const [dialogTargetFile, setDialogTargetFile] = useState('')
+	const [dialogUploadLoading, setDialogUploadLoading] = useState(false)
+	const [dialogDownloadLoading, setDialogDownloadLoading] = useState(false)
+	const [dialogDeleteLoading, setDialogDeleteLoading] = useState(false)
+
+	const closeDialogFilePicker = useCallback(() => {
+		dialogFilePickerRef.current?.close()
+	}, [])
+
+	const openDialogFilePicker = useCallback(async (action: 'upload' | 'download' | 'delete') => {
+		if (!isDialogGenerator || !uri) {
+			return
+		}
+		setDialogFileAction(action)
+		setDialogFilePickerLoading(true)
+		dialogFilePickerRef.current?.showModal()
+		const currentFile = fileUtil.basename(uri)
+		try {
+			const files = await dialogApi.apiDialogListGet()
+			const uniqueFiles = Array.from(new Set(files)).sort((a, b) => a.localeCompare(b))
+			setDialogFiles(uniqueFiles)
+			if (action === 'upload') {
+				setDialogTargetFile(currentFile)
+			} else {
+				setDialogTargetFile(uniqueFiles[0] ?? currentFile)
+			}
+		} catch (e) {
+			if (e instanceof Error) {
+				setError(e)
+			} else {
+				setError('Failed to list dialog files')
+			}
+			closeDialogFilePicker()
+		} finally {
+			setDialogFilePickerLoading(false)
+		}
+	}, [isDialogGenerator, uri, dialogApi, closeDialogFilePicker])
+
+	const submitDialogFileAction = useCallback(async () => {
+		if (!uri || !service) {
+			return
+		}
+		const targetFile = dialogTargetFile.trim()
+		if (!targetFile) {
+			setError('Dialog file name is required')
+			return
+		}
+		if (dialogFileAction !== 'upload' && !dialogFiles.includes(targetFile)) {
+			setError(`Dialog file \"${targetFile}\" was not found`)
+			return
+		}
+		try {
+			if (dialogFileAction === 'upload') {
+				if (!doc) {
+					return
+				}
+				setDialogUploadLoading(true)
+				const body = JSON.parse(doc.getText()) as object
+				await dialogApi.apiDialogUploadPost({ file: targetFile, body })
+			} else {
+				if (dialogFileAction === 'download') {
+					setDialogDownloadLoading(true)
+					const body = await dialogApi.apiDialogDownloadGet({ file: targetFile })
+					await service.writeFile(uri, `${JSON.stringify(body, null, 2)}\n`)
+				} else {
+					setDialogDeleteLoading(true)
+					await dialogApi.apiDialogDeleteDelete({ file: targetFile })
+					setDialogFiles(dialogFiles.filter(file => file !== targetFile))
+				}
+			}
+			closeDialogFilePicker()
+		} catch (e) {
+			if (e instanceof Error) {
+				setError(e)
+			} else {
+				setError(`Failed to ${dialogFileAction} dialog file`)
+			}
+		} finally {
+			setDialogUploadLoading(false)
+			setDialogDownloadLoading(false)
+			setDialogDeleteLoading(false)
+		}
+	}, [uri, service, dialogTargetFile, dialogFileAction, dialogFiles, doc, dialogApi, closeDialogFilePicker])
 
 	const copySource = () => {
 		Analytics.copyOutput(gen.id, 'menu')
@@ -314,6 +405,7 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const hasPreview = HasPreview.includes(gen.id) && !(gen.id === 'worldgen/configured_feature' && checkVersion(version, '1.18'))
 	if (previewShown && !hasPreview) setPreviewShown(false)
 	let actionsShown = 2
+	if (isDialogGenerator) actionsShown += 3
 	if (hasPreview) actionsShown += 1
 	if (sourceShown) actionsShown += 2
 
@@ -409,6 +501,15 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 			<div class={`popup-action action-preview${hasPreview ? ' shown' : ''} tooltipped tip-nw`} aria-label={locale(previewShown ? 'hide_preview' : 'show_preview')} onClick={togglePreview}>
 				{previewShown ? Octicon.x_circle : Octicon.play}
 			</div>
+			<div class={`popup-action action-dialog-download${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDownloadLoading ? ' loading' : ''}`} aria-label={locale('dialog_download')} onClick={() => openDialogFilePicker('download')}>
+				{dialogDownloadLoading ? Octicon.sync : Octicon.download}
+			</div>
+			<div class={`popup-action action-dialog-upload${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogUploadLoading ? ' loading' : ''}`} aria-label={locale('dialog_upload')} onClick={() => openDialogFilePicker('upload')}>
+				{dialogUploadLoading ? Octicon.sync : Octicon.upload}
+			</div>
+			<div class={`popup-action action-dialog-delete${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDeleteLoading ? ' loading' : ''}`} aria-label={locale('dialog_delete')} onClick={() => openDialogFilePicker('delete')}>
+				{dialogDeleteLoading ? Octicon.sync : Octicon.trashcan}
+			</div>
 			<div class={`popup-action action-share shown tooltipped tip-nw${shareLoading ? ' loading' : ''}`} aria-label={locale(shareLoading ? 'share.loading' : 'share')} onClick={share}>
 				{shareLoading ? Octicon.sync : Octicon.link}
 			</div>
@@ -432,6 +533,35 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 			<TextInput value={shareUrl} readonly />
 			<Btn icon={shareCopyActive ? 'check' : 'copy'} onClick={copySharedId} tooltip={locale(shareCopyActive ? 'copied' : 'copy_share')} tooltipLoc="nw" active={shareCopyActive} />
 		</div>
+		<dialog ref={dialogFilePickerRef} class="dialog-file-picker">
+			<div class="dialog-file-picker-content">
+				<h3>{dialogFileAction === 'upload' ? 'Upload dialog JSON' : dialogFileAction === 'delete' ? 'Delete saved dialog' : 'Download dialog JSON'}</h3>
+				{dialogFilePickerLoading
+					? <p>Loading files...</p>
+					: dialogFileAction !== 'upload'
+						? <select value={dialogTargetFile} onInput={(e) => setDialogTargetFile((e.target as HTMLSelectElement).value)}>
+							{dialogFiles.map(file => <option value={file} key={file}>{file}</option>)}
+						</select>
+						: <input
+							type="text"
+							value={dialogTargetFile}
+							onInput={(e) => setDialogTargetFile((e.target as HTMLInputElement).value)}
+							placeholder="dialog.json"
+						/>
+				}
+				<div class="dialog-file-picker-actions">
+					<button type="button" class="btn" onClick={closeDialogFilePicker}>Cancel</button>
+					<button
+						type="button"
+						class="btn"
+						disabled={dialogFilePickerLoading || dialogUploadLoading || dialogDownloadLoading || dialogDeleteLoading}
+						onClick={submitDialogFileAction}
+					>
+						{dialogFileAction === 'upload' ? 'Upload' : dialogFileAction === 'delete' ? 'Delete' : 'Download'}
+					</button>
+				</div>
+			</div>
+		</dialog>
 		<div class="popup-actions left-actions" style="--offset: 50px;">
 			<div class={'popup-action action-project shown tooltipped tip-ne'} aria-label={locale(projectShown ? 'hide_project' : 'show_project')} onClick={toggleProjectShown}>
 				{projectShown ? Octicon.chevron_left : Octicon.repo}

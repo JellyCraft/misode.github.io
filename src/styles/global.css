@@ -1346,6 +1346,59 @@ main.has-project {
 	fill: var(--accent-success);
 }
 
+.dialog-file-picker {
+	border: none;
+	border-radius: 12px;
+	padding: 0;
+	background-color: var(--background-4);
+	color: var(--text-1);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.dialog-file-picker::backdrop {
+	background: rgba(0, 0, 0, 0.45);
+}
+
+.dialog-file-picker-content {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: min(420px, calc(100vw - 32px));
+	padding: 16px;
+}
+
+.dialog-file-picker-content > h3 {
+	margin: 0;
+	font-size: 18px;
+}
+
+.dialog-file-picker-content > p {
+	margin: 0;
+	color: var(--text-2);
+}
+
+.dialog-file-picker-content > input {
+	padding: 9px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--background-6);
+	background: var(--background-3);
+	color: var(--text-1);
+}
+
+.dialog-file-picker-content > select {
+	padding: 9px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--background-6);
+	background: var(--background-3);
+	color: var(--text-1);
+}
+
+.dialog-file-picker-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
 .tooltipped {
 	position: relative;
 }

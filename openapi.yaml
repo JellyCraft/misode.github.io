@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Dialog file service
+  description: Dialog file service
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:8080'
+paths:
+  /api/dialog/download:
+    get:
+      parameters:
+        - $ref: '#/components/parameters/FileName'
+      summary: Download a dialog file
+      responses:
+        '200':
+          description: File has been found
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Dialog file not found
+  /api/dialog/list:
+    get:
+      summary: List all dialog files
+      responses:
+        '200':
+          description: A list of dialog files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  /api/dialog/upload:
+    post:
+      summary: Upload a dialog file
+      parameters:
+        - $ref: '#/components/parameters/FileName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Dialog file uploaded successfully
+        '403':
+          description: Forbidden
+  /api/dialog/delete:
+    delete:
+      summary: Delete a dialog file
+      parameters:
+        - $ref: '#/components/parameters/FileName'
+      responses:
+        '200':
+          description: Dialog file deleted successfully
+        '404':
+          description: Dialog file not found
+
+components:
+  parameters:
+    FileName:
+      name: file
+      in: query
+      required: true
+      schema:
+        type: string
+        description: The name of the dialog file to target
