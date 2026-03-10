@@ -51,7 +51,12 @@ dispatch blood:nodes[blood:label_node] to struct {
 }
 
 dispatch blood:nodes[blood:action_node] to struct {
-  action: Action
+  action: Action,
+}
+
+dispatch blood:nodes[blood:chapter_node] to struct {
+  name: string @ 1..,
+  children: [Node],
 }
 
 dispatch blood:nodes[blood:end_node] to struct {
@@ -69,6 +74,7 @@ enum(string) NodeType {
   ChoiceNode = "blood:choice_node",
   LabelNode = "blood:label_node",
   ActionNode = "blood:action_node",
+  ChapterNode = "blood:chapter_node",
   EndNode = "blood:end_node"
 }
 
