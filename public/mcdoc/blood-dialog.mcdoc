@@ -25,10 +25,12 @@ struct Actor {
 dispatch blood:nodes[blood:tell_node] to struct {
   text: Text,
   actor: string,
+  pauseAfterMessage?: boolean,
 }
 
 dispatch blood:nodes[blood:say_node] to struct {
   text: Text,
+  pauseAfterMessage?: boolean,
 }
 
 dispatch blood:nodes[blood:branch_node] to struct {
