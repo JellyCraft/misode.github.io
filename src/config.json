@@ -225,11 +225,6 @@
       "noPath": true,
       "tags": ["blood"],
       "dependency": "blood-dialog"
-    },
-    {
-      "id": "recipe",
-      "url": "recipe",
-      "wiki": "https://minecraft.wiki/w/Recipe#JSON_format"
     }
   ],
   "legacyGuides": [

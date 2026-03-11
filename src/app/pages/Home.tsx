@@ -1,9 +1,7 @@
 import {useMemo} from 'preact/hooks'
-import {ChangelogEntry, Footer, GeneratorCard, ToolCard, ToolGroup} from '../components/index.js'
+import {Footer, GeneratorCard, ToolGroup} from '../components/index.js'
 import {useLocale, useTitle} from '../contexts/index.js'
-import {useAsync} from '../hooks/useAsync.js'
 import {useMediaQuery} from '../hooks/index.js'
-import {fetchChangelogs, fetchVersions} from '../services/index.js'
 import {Store} from '../Store.js'
 
 const MIN_FAVORITES = 2
@@ -24,13 +22,9 @@ export function Home({}: Props) {
 				{smallScreen ? /* mobile */ <>
 					<PopularGenerators />
 					<FavoriteGenerators />
-					<Changelog />
-					<Versions />
 				</> : /* desktop */ <>
 					<div class="card-column">
 						<PopularGenerators />
-						<Changelog />
-						<Versions />
 					</div>
 					{!smallScreen && <div class="card-column">
 						<FavoriteGenerators />
@@ -45,12 +39,7 @@ export function Home({}: Props) {
 function PopularGenerators() {
 	const { locale } = useLocale()
 	return <ToolGroup title={locale('generators.popular')} link="/generators/">
-		<GeneratorCard minimal id="loot_table" />
-		<GeneratorCard minimal id="advancement" />
-		<GeneratorCard minimal id="recipe" />
-		<ToolCard title={locale('worldgen')} link="/worldgen/" titleIcon="worldgen" />
-		<ToolCard title={locale('generators.all')} link="/generators/" titleIcon="arrow_right" />
-		<ToolCard title={locale('generators.partners')} link="/partners/" titleIcon="arrow_right" />
+		<GeneratorCard minimal id="blood:blood-dialog" />
 	</ToolGroup>
 }
 
@@ -71,39 +60,5 @@ function FavoriteGenerators() {
 
 	return <ToolGroup title={locale('generators.recent')}>
 		{favorites.map(f => <GeneratorCard minimal id={f} />)}
-	</ToolGroup>
-}
-
-function Versions() {
-	const { locale } = useLocale()
-
-	const { value: versions } = useAsync(fetchVersions, [])
-	const release = useMemo(() => versions?.find(v => v.type === 'release'), [versions])
-
-	return <ToolGroup title={locale('versions.minecraft_versions')} link="/versions/" titleIcon="arrow_right">
-		{(versions?.[0] && release) && <>
-			{versions[0].id !== release.id && (
-				<ToolCard title={versions[0].name} link={`/versions/?id=${versions[0].id}`} desc={locale('versions.latest_snapshot')} />
-			)}
-			<ToolCard title={release.name} link={`/versions/?id=${release.id}`} desc={locale('versions.latest_release')} />
-		</>}
-	</ToolGroup>
-}
-
-function Changelog() {
-	const { locale } = useLocale()
-
-	const hugeScreen = useMediaQuery('(min-width: 960px)')
-
-	const { value: changes } = useAsync(fetchChangelogs, [])
-	const latestChanges = useMemo(() => {
-		return changes
-			?.sort((a, b) => b.order - a.order)
-			.filter(c => !(c.tags.includes('pack') && c.tags.includes('breaking')))
-			.slice(0, 2)
-	}, [changes])
-
-	return <ToolGroup title={locale('changelog')} link="/changelog/" titleIcon="git_commit">
-		{latestChanges?.map(change => <ChangelogEntry minimal={!hugeScreen} short={true} change={change} />)}
 	</ToolGroup>
 }
