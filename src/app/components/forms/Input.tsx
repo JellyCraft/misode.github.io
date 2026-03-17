@@ -36,6 +36,8 @@ function BaseInput<T>(name: string, type: string, fn: (value: string) => T) {
 
 export const TextInput = BaseInput('TextInput', 'text', v => v)
 
+export const PasswordInput = BaseInput('PasswordInput', 'password', v => v)
+
 export const NumberInput = BaseInput('NumberInput', 'number', v => Number(v))
 
 export const RangeInput = BaseInput('RangeInput', 'range', v => Number(v))

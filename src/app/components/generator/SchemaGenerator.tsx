@@ -1,3 +1,4 @@
+import { Fragment } from 'preact'
 import { route } from 'preact-router'
 import { useCallback, useEffect, useErrorBoundary, useMemo, useRef, useState } from 'preact/hooks'
 import { fileUtil } from '@spyglassmc/core'
@@ -9,18 +10,62 @@ import { DRAFT_PROJECT, useLocale, useProject, useVersion } from '../../contexts
 import { useModal } from '../../contexts/Modal.jsx'
 import { useSpyglass, watchSpyglassUri } from '../../contexts/Spyglass.jsx'
 import { AsyncCancel, useActiveTimeout, useAsync, useLocalStorage, useSearchParam } from '../../hooks/index.js'
-import { DefaultApi } from '../../services/integration/gen/index.js'
+import { Configuration, DefaultApi } from '../../services/integration/gen/index.js'
 import type { VersionId } from '../../services/index.js'
 import { checkVersion, fetchDependencyMcdoc, fetchPreset, fetchRegistries, getSnippet, shareSnippet } from '../../services/index.js'
 import { DEPENDENCY_URI } from '../../services/Spyglass.js'
 import { Store } from '../../Store.js'
 import { cleanUrl, genPath } from '../../Utils.js'
 import { FancyMenu } from '../FancyMenu.jsx'
-import { Btn, BtnMenu, ErrorPanel, FileCreation, FileView, Footer, HasPreview, Octicon, PreviewPanel, ProjectPanel, SourcePanel, TextInput, VersionSwitcher } from '../index.js'
+import { Btn, BtnMenu, ErrorPanel, FileCreation, FileView, Footer, HasPreview, Octicon, PreviewPanel, ProjectPanel, SourcePanel, TextInput, PasswordInput, VersionSwitcher } from '../index.js'
+import { Modal } from '../Modal.js'
 import { getRootDefault } from './McdocHelpers.js'
 
 export const SHARE_KEY = 'share'
 const MIN_PROJECT_PANEL_WIDTH = 200
+
+interface DialogTokenModalProps {
+	onToken: (token: string) => void
+	onCancel: () => void
+}
+
+function DialogTokenModal({ onToken, onCancel }: DialogTokenModalProps) {
+	const [token, setToken] = useState('')
+	const [error, setError] = useState<string | null>(null)
+
+	const submit = () => {
+		const t = token.trim()
+		if (!t) {
+			setError('Token is required')
+			return
+		}
+		setError(null)
+		onToken(t)
+	}
+
+	return (
+		<Modal class="dialog-token-modal">
+			<div class="flex flex-col gap-2">
+				<p>Enter authorization token for dialog API</p>
+				<PasswordInput
+					class="btn btn-input"
+					value={token}
+					onChange={(v) => { setError(null); setToken(v) }}
+					onEnter={submit}
+					onCancel={onCancel}
+					placeholder="Token"
+					spellcheck={false}
+					autofocus
+				/>
+				{error && <p class="note">{error}</p>}
+				<div class="dialog-token-modal-actions flex gap-2">
+					<button type="button" class="btn" onClick={onCancel}>Cancel</button>
+					<button type="button" class="btn" onClick={submit}>Submit</button>
+				</div>
+			</div>
+		</Modal>
+	)
+}
 
 interface Props {
 	gen: ConfigGenerator
@@ -30,7 +75,7 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const { locale } = useLocale()
 	const { version, changeVersion, changeTargetVersion } = useVersion()
 	const { service } = useSpyglass()
-	const { showModal } = useModal()
+	const { showModal, hideModal } = useModal()
 	const { project, projectUri, setProjectUri, updateProject } = useProject()
 	const [error, setError] = useState<Error | string | null>(null)
 	const [errorBoundary, errorRetry] = useErrorBoundary()
@@ -290,7 +335,14 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const [doDownload, setDownload] = useState(0)
 	const [doImport, setImport] = useState(0)
 	const isDialogGenerator = gen.id === 'blood:blood-dialog'
-	const dialogApi = useMemo(() => new DefaultApi(), [])
+	const DIALOG_TOKEN_KEY = 'blood_dialog_api_token'
+	const [dialogToken, setDialogToken] = useLocalStorage(DIALOG_TOKEN_KEY, '')
+	const [pendingDialogAction, setPendingDialogAction] = useState<'upload' | 'download' | 'delete' | null>(null)
+	const hasDialogToken = dialogToken.trim().length > 0
+	const dialogApi = useMemo(
+		() => hasDialogToken ? new DefaultApi(new Configuration({ headers: { Authorization: dialogToken } })) : null,
+		[dialogToken, hasDialogToken]
+	)
 	const dialogFilePickerRef = useRef<HTMLDialogElement>(null)
 	const [dialogFilePickerLoading, setDialogFilePickerLoading] = useState(false)
 	const [dialogFileAction, setDialogFileAction] = useState<'upload' | 'download' | 'delete'>('download')
@@ -306,6 +358,25 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 
 	const openDialogFilePicker = useCallback(async (action: 'upload' | 'download' | 'delete') => {
 		if (!isDialogGenerator || !uri) {
+			return
+		}
+		if (!hasDialogToken) {
+			setPendingDialogAction(action)
+			showModal(() => (
+				<DialogTokenModal
+					onToken={(t) => {
+						setDialogToken(t)
+						hideModal()
+					}}
+					onCancel={() => {
+						setPendingDialogAction(null)
+						hideModal()
+					}}
+				/>
+			))
+			return
+		}
+		if (!dialogApi) {
 			return
 		}
 		setDialogFileAction(action)
@@ -331,10 +402,18 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 		} finally {
 			setDialogFilePickerLoading(false)
 		}
-	}, [isDialogGenerator, uri, dialogApi, closeDialogFilePicker])
+	}, [isDialogGenerator, uri, hasDialogToken, dialogApi, closeDialogFilePicker, showModal, hideModal])
+
+	useEffect(() => {
+		if (hasDialogToken && pendingDialogAction && dialogApi) {
+			const action = pendingDialogAction
+			setPendingDialogAction(null)
+			openDialogFilePicker(action)
+		}
+	}, [hasDialogToken, pendingDialogAction, dialogApi, openDialogFilePicker])
 
 	const submitDialogFileAction = useCallback(async () => {
-		if (!uri || !service) {
+		if (!uri || !service || !dialogApi) {
 			return
 		}
 		const targetFile = dialogTargetFile.trim()
@@ -472,7 +551,7 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 		setProjectUri(undefined)
 	}, [gen, service, showModal])
 
-	return <>
+	return <Fragment>
 		<main class={`${previewShown ? 'has-preview' : ''} ${projectShown ? 'has-project' : ''}`} style={`--project-panel-width: ${realPanelWidth}px`}>
 			<div class="controls generator-controls">
 				{gen.wiki && <a class="btn btn-link tooltipped tip-se" aria-label={locale('learn_on_the_wiki')} href={gen.wiki} target="_blank">
@@ -571,5 +650,5 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 			<ProjectPanel/>
 			<div class="panel-resize" onMouseDown={(e) => setResizeStart(e.clientX - panelWidth)}></div>
 		</div>
-	</>
+	</Fragment>
 }
