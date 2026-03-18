@@ -1,25 +1,47 @@
-import { Fragment } from 'preact'
-import { route } from 'preact-router'
-import { useCallback, useEffect, useErrorBoundary, useMemo, useRef, useState } from 'preact/hooks'
-import { fileUtil } from '@spyglassmc/core'
-import type { Method } from '../../Analytics.js'
-import { Analytics } from '../../Analytics.js'
-import type { ConfigGenerator } from '../../Config.js'
+import {Fragment} from 'preact'
+import {route} from 'preact-router'
+import {useCallback, useEffect, useErrorBoundary, useMemo, useRef, useState} from 'preact/hooks'
+import {fileUtil} from '@spyglassmc/core'
+import type {Method} from '../../Analytics.js'
+import {Analytics} from '../../Analytics.js'
+import type {ConfigGenerator} from '../../Config.js'
 import config from '../../Config.js'
-import { DRAFT_PROJECT, useLocale, useProject, useVersion } from '../../contexts/index.js'
-import { useModal } from '../../contexts/Modal.jsx'
-import { useSpyglass, watchSpyglassUri } from '../../contexts/Spyglass.jsx'
-import { AsyncCancel, useActiveTimeout, useAsync, useLocalStorage, useSearchParam } from '../../hooks/index.js'
-import { Configuration, DefaultApi } from '../../services/integration/gen/index.js'
-import type { VersionId } from '../../services/index.js'
-import { checkVersion, fetchDependencyMcdoc, fetchPreset, fetchRegistries, getSnippet, shareSnippet } from '../../services/index.js'
-import { DEPENDENCY_URI } from '../../services/Spyglass.js'
-import { Store } from '../../Store.js'
-import { cleanUrl, genPath } from '../../Utils.js'
-import { FancyMenu } from '../FancyMenu.jsx'
-import { Btn, BtnMenu, ErrorPanel, FileCreation, FileView, Footer, HasPreview, Octicon, PreviewPanel, ProjectPanel, SourcePanel, TextInput, PasswordInput, VersionSwitcher } from '../index.js'
-import { Modal } from '../Modal.js'
-import { getRootDefault } from './McdocHelpers.js'
+import {DRAFT_PROJECT, useLocale, useProject, useVersion} from '../../contexts/index.js'
+import {useModal} from '../../contexts/Modal.jsx'
+import {useSpyglass, watchSpyglassUri} from '../../contexts/Spyglass.jsx'
+import {AsyncCancel, useActiveTimeout, useAsync, useLocalStorage, useSearchParam} from '../../hooks/index.js'
+import {Configuration, DefaultApi} from '../../services/integration/gen/index.js'
+import type {VersionId} from '../../services/index.js'
+import {
+  checkVersion,
+  fetchDependencyMcdoc,
+  fetchPreset,
+  fetchRegistries,
+  getSnippet,
+  shareSnippet
+} from '../../services/index.js'
+import {DEPENDENCY_URI} from '../../services/Spyglass.js'
+import {Store} from '../../Store.js'
+import {cleanUrl, genPath} from '../../Utils.js'
+import {FancyMenu} from '../FancyMenu.jsx'
+import {
+  Btn,
+  BtnMenu,
+  ErrorPanel,
+  FileCreation,
+  FileView,
+  Footer,
+  HasPreview,
+  Octicon,
+  PasswordInput,
+  PreviewPanel,
+  ProjectPanel,
+  SourcePanel,
+  TextInput,
+  VersionSwitcher
+} from '../index.js'
+import {Modal} from '../Modal.js'
+import {getRootDefault} from './McdocHelpers.js'
 
 export const SHARE_KEY = 'share'
 const MIN_PROJECT_PANEL_WIDTH = 200
@@ -337,7 +359,6 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const isDialogGenerator = gen.id === 'blood:blood-dialog'
 	const DIALOG_TOKEN_KEY = 'blood_dialog_api_token'
 	const [dialogToken, setDialogToken] = useLocalStorage(DIALOG_TOKEN_KEY, '')
-	const [pendingDialogAction, setPendingDialogAction] = useState<'upload' | 'download' | 'delete' | null>(null)
 	const hasDialogToken = dialogToken.trim().length > 0
 	const dialogApi = useMemo(
 		() => hasDialogToken ? new DefaultApi(new Configuration({ headers: { Authorization: dialogToken } })) : null,
@@ -356,27 +377,26 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 		dialogFilePickerRef.current?.close()
 	}, [])
 
+	const openDialogTokenModal = useCallback(() => {
+		if (!isDialogGenerator) {
+			return
+		}
+		showModal(() => (
+			<DialogTokenModal
+				onToken={(t) => {
+					setDialogToken(t)
+					hideModal()
+				}}
+				onCancel={hideModal}
+			/>
+		))
+	}, [isDialogGenerator, showModal, hideModal, setDialogToken])
+
 	const openDialogFilePicker = useCallback(async (action: 'upload' | 'download' | 'delete') => {
 		if (!isDialogGenerator || !uri) {
 			return
 		}
-		if (!hasDialogToken) {
-			setPendingDialogAction(action)
-			showModal(() => (
-				<DialogTokenModal
-					onToken={(t) => {
-						setDialogToken(t)
-						hideModal()
-					}}
-					onCancel={() => {
-						setPendingDialogAction(null)
-						hideModal()
-					}}
-				/>
-			))
-			return
-		}
-		if (!dialogApi) {
+		if (!hasDialogToken || !dialogApi) {
 			return
 		}
 		setDialogFileAction(action)
@@ -402,15 +422,7 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 		} finally {
 			setDialogFilePickerLoading(false)
 		}
-	}, [isDialogGenerator, uri, hasDialogToken, dialogApi, closeDialogFilePicker, showModal, hideModal])
-
-	useEffect(() => {
-		if (hasDialogToken && pendingDialogAction && dialogApi) {
-			const action = pendingDialogAction
-			setPendingDialogAction(null)
-			openDialogFilePicker(action)
-		}
-	}, [hasDialogToken, pendingDialogAction, dialogApi, openDialogFilePicker])
+	}, [isDialogGenerator, uri, hasDialogToken, dialogApi, closeDialogFilePicker])
 
 	const submitDialogFileAction = useCallback(async () => {
 		if (!uri || !service || !dialogApi) {
@@ -484,9 +496,10 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 	const hasPreview = HasPreview.includes(gen.id) && !(gen.id === 'worldgen/configured_feature' && checkVersion(version, '1.18'))
 	if (previewShown && !hasPreview) setPreviewShown(false)
 	let actionsShown = 2
-	if (isDialogGenerator) actionsShown += 3
+	if (isDialogGenerator) actionsShown += 4
 	if (hasPreview) actionsShown += 1
 	if (sourceShown) actionsShown += 2
+	const dialogActionsEnabled = isDialogGenerator && hasDialogToken && !!dialogApi
 
 	const togglePreview = () => {
 		if (sourceShown) {
@@ -580,13 +593,38 @@ export function SchemaGenerator({ gen, allowedVersions }: Props) {
 			<div class={`popup-action action-preview${hasPreview ? ' shown' : ''} tooltipped tip-nw`} aria-label={locale(previewShown ? 'hide_preview' : 'show_preview')} onClick={togglePreview}>
 				{previewShown ? Octicon.x_circle : Octicon.play}
 			</div>
-			<div class={`popup-action action-dialog-download${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDownloadLoading ? ' loading' : ''}`} aria-label={locale('dialog_download')} onClick={() => openDialogFilePicker('download')}>
+			<div
+				class={`popup-action action-dialog-token${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${hasDialogToken ? '' : ' active'}`}
+				aria-label={hasDialogToken ? 'Dialog token is set' : 'Set dialog API token'}
+				onClick={openDialogTokenModal}
+			>
+				{hasDialogToken ? Octicon.unlock : Octicon.lock}
+			</div>
+			<div
+				class={`popup-action action-dialog-download${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDownloadLoading ? ' loading' : ''}`}
+				style={!dialogActionsEnabled ? 'opacity: 0.4; cursor: not-allowed;' : undefined}
+				aria-label={!dialogActionsEnabled ? 'Set dialog token to enable' : locale('dialog_download')}
+				aria-disabled={!dialogActionsEnabled}
+				onClick={dialogActionsEnabled ? () => openDialogFilePicker('download') : undefined}
+			>
 				{dialogDownloadLoading ? Octicon.sync : Octicon.download}
 			</div>
-			<div class={`popup-action action-dialog-upload${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogUploadLoading ? ' loading' : ''}`} aria-label={locale('dialog_upload')} onClick={() => openDialogFilePicker('upload')}>
+			<div
+				class={`popup-action action-dialog-upload${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogUploadLoading ? ' loading' : ''}`}
+				style={!dialogActionsEnabled ? 'opacity: 0.4; cursor: not-allowed;' : undefined}
+				aria-label={!dialogActionsEnabled ? 'Set dialog token to enable' : locale('dialog_upload')}
+				aria-disabled={!dialogActionsEnabled}
+				onClick={dialogActionsEnabled ? () => openDialogFilePicker('upload') : undefined}
+			>
 				{dialogUploadLoading ? Octicon.sync : Octicon.upload}
 			</div>
-			<div class={`popup-action action-dialog-delete${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDeleteLoading ? ' loading' : ''}`} aria-label={locale('dialog_delete')} onClick={() => openDialogFilePicker('delete')}>
+			<div
+				class={`popup-action action-dialog-delete${isDialogGenerator ? ' shown' : ''} tooltipped tip-nw${dialogDeleteLoading ? ' loading' : ''}`}
+				style={!dialogActionsEnabled ? 'opacity: 0.4; cursor: not-allowed;' : undefined}
+				aria-label={!dialogActionsEnabled ? 'Set dialog token to enable' : locale('dialog_delete')}
+				aria-disabled={!dialogActionsEnabled}
+				onClick={dialogActionsEnabled ? () => openDialogFilePicker('delete') : undefined}
+			>
 				{dialogDeleteLoading ? Octicon.sync : Octicon.trashcan}
 			</div>
 			<div class={`popup-action action-share shown tooltipped tip-nw${shareLoading ? ' loading' : ''}`} aria-label={locale(shareLoading ? 'share.loading' : 'share')} onClick={share}>
