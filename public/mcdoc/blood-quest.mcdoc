@@ -1,0 +1,164 @@
+use ::java::util::text::Text
+
+dispatch minecraft:resource[blood:blood-quest] to struct Quest {
+  id: string,
+  type: QuestType,
+  name: Text,
+  description: Text,
+  actor: string,
+  /// Changing this will reset players' progress if quest is active upon reload
+  version: string,
+  rewards: [Reward],
+  stages: [Stage],
+}
+
+enum(string) QuestType {
+  Campaign = "campaign",
+  Side = "side",
+  Daily = "daily",
+  Weekly = "weekly",
+  Event = "event",
+}
+
+enum(string) RewardType {
+  Item = "blood:item",
+  Currency = "blood:currency",
+}
+
+// --- Rewards ---
+
+dispatch minecraft:resource[blood:reward] to struct Reward {
+  type: RewardType,
+  ...blood:reward[[type]],
+}
+
+dispatch blood:reward[blood:item] to struct {
+  item: ItemDefinition,
+}
+
+enum(string) Currency {
+  BloodOrb = "BLOOD_ORB",
+  Silver = "SILVER",
+}
+
+dispatch blood:reward[blood:currency] to struct {
+  currency: Currency,
+  amount: int@1..,
+}
+
+// --- Item Definitions ---
+
+enum(string) ItemDefinitionType {
+  ItemStack = "blood:item_stack",
+  Material = "blood:material",
+}
+
+dispatch minecraft:resource[blood:reward] to struct ItemDefinition {
+  type: ItemDefinitionType,
+  ...blood:item_definition[[type]],
+}
+
+dispatch blood:item_definition[blood:item_stack] to struct {
+  /// Bukkit ItemStack serialized data
+  yml: string,
+}
+
+dispatch blood:item_definition[blood:material] to struct {
+  material: string,
+  amount: int@1..,
+}
+
+// --- Helper Structs ---
+
+dispatch minecraft:resource[blood:stage] to struct Stage {
+  name: Text,
+  coordinates: string,
+  goals: [Goal]
+}
+
+struct Area {
+  /// Center coordinates in "world x y z" or F3+C format
+  location: string,
+  /// Radius in blocks
+  radius: float,
+}
+
+// --- Goals ---
+
+enum(string) GoalType {
+  Kill = "blood:kill",
+  Gather = "blood:gather",
+  Deliver = "blood:deliver",
+  Talk = "blood:talk",
+  Reach = "blood:reach",
+  InteractEntity = "blood:interact_entity",
+  InteractBlock = "blood:interact_block",
+  ShootArea = "blood:shoot_area",
+  Consume = "blood:consume",
+  Die = "blood:die", // lmao
+  KillPlayer = "blood:kill_player",
+  Pickup = "blood:pickup",
+  GetTag = "blood:get_tag",
+}
+
+dispatch minecraft:resource[blood:goal] to struct Goal {
+  type: GoalType,
+  ...blood:goal[[type]],
+}
+
+dispatch blood:goal[blood:kill] to struct {
+  /// Registry Key
+  entity_type: string,
+  /// Amount of entities to kill
+  amount: int@1..,
+}
+
+dispatch blood:goal[blood:gather] to struct {
+  item: ItemDefinition,
+}
+
+dispatch blood:goal[blood:deliver] to struct {
+  item: ItemDefinition,
+  /// ActorId of NPC to whom to deliver
+  actor: string,
+}
+
+dispatch blood:goal[blood:talk] to struct {
+  /// ActorId of NPC to whom to talk
+  actor: string,
+}
+
+dispatch blood:goal[blood:reach] to struct {
+  area: Area,
+}
+
+dispatch blood:goal[blood:interact_entity] to struct {
+  /// Entity registry key
+  entity_type: string,
+}
+
+dispatch blood:goal[blood:interact_block] to struct {
+  /// Block position formatted as "world x y z"
+  block: string,
+}
+
+dispatch blood:goal[blood:shoot_area] to struct {
+  area: Area,
+}
+
+dispatch blood:goal[blood:consume] to struct {
+  item: ItemDefinition,
+  amount: int@1..,
+}
+
+dispatch blood:goal[blood:die] to struct {
+}
+
+dispatch blood:goal[blood:kill_player] to struct {
+  // TODO: Player Predicate?
+  amount: int@1..,
+}
+
+dispatch blood:goal[blood:get_tag] to struct {
+  tag: string,
+}

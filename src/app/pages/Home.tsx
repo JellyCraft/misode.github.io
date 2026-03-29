@@ -40,6 +40,7 @@ function PopularGenerators() {
 	const { locale } = useLocale()
 	return <ToolGroup title={locale('generators.popular')} link="/generators/">
 		<GeneratorCard minimal id="blood:blood-dialog" />
+    <GeneratorCard minimal id="blood:blood-quest" />
 	</ToolGroup>
 }
 

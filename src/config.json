@@ -225,6 +225,13 @@
       "noPath": true,
       "tags": ["blood"],
       "dependency": "blood-dialog"
+    },
+    {
+      "id": "blood:blood-quest",
+      "url": "blood/blood-quest",
+      "noPath": true,
+      "tags": ["blood"],
+      "dependency": "blood-quest"
     }
   ],
   "legacyGuides": [
